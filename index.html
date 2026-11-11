@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<!--
+  Focus Hub: a single-file focus timer (Pomodoro, tasks, stats, ambient sound).
+  No build step, no dependencies. Open this file, or host it free with GitHub Pages
+  (rename to index.html in the repo root). Data is stored in your browser.
+  Shortcuts: Space start/pause, R reset, S skip, 1/2/3 modes, N new task.
+  MIT License, Copyright (c) 2026
+-->
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus Hub</title>
+<meta name="theme-color" content="#3047FF">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='30' fill='%23EDF0E4'/%3E%3Cpath d='M0 70Q20 58 40 70T80 70T128 70V128H0Z' fill='%233047FF'/%3E%3Crect x='2' y='2' width='124' height='124' rx='28' fill='none' stroke='%230F1E3D' stroke-width='4'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#EDF0E4;--ink:#0F1E3D;--blue:#3047FF;--mint:#9BE8BE;--mute:#5B6783;--line:#0F1E3D26;--ok:#1E9E62;color-scheme:light}
+:root[data-theme=dark]{--paper:#0D1430;--ink:#EDF0E4;--blue:#4F63FF;--mute:#97A0BC;--line:#EDF0E433;--ok:#5BD79B;color-scheme:dark}
+body{--fill:var(--blue);--on:#fff}body[data-mode=break]{--fill:var(--mint);--on:#0F1E3D}
+*{box-sizing:border-box;margin:0}
+body{background:var(--paper);color:var(--ink);font:16px/1.5 "Instrument Sans",system-ui,sans-serif;min-height:100vh;transition:background .3s}
+button,input,select{font:inherit;color:inherit}button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:3px solid var(--blue);outline-offset:3px;border-radius:8px}
+header{max-width:1180px;margin:0 auto;padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center}
+.logo{font:700 24px "Bricolage Grotesque",sans-serif;letter-spacing:-.03em}
+nav{display:flex;gap:6px}nav button{padding:8px 14px;border-radius:99px;font-weight:500;color:var(--mute)}nav button:hover{color:var(--ink);background:var(--line)}
+.app{max-width:1180px;margin:0 auto;padding:20px 24px 56px;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:56px}
+@media(max-width:860px){.app{grid-template-columns:1fr;gap:36px}}
+.stage{position:relative;overflow:hidden;border:2px solid var(--ink);border-radius:40px;height:min(64vh,580px);min-height:420px;isolation:isolate}
+.fill{position:absolute;left:0;right:0;bottom:0;height:var(--p,0%);background:var(--fill);overflow:hidden;transition:height 1s linear,background .4s}
+.wave{position:absolute;left:0;right:0;bottom:var(--p,0%);height:16px;background:var(--fill);transition:bottom 1s linear,background .4s;
+ -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 16'%3E%3Cpath d='M0 16V8Q22 0 45 8T90 8V16Z'/%3E%3C/svg%3E") repeat-x 0 0/90px 16px;
+ mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 16'%3E%3Cpath d='M0 16V8Q22 0 45 8T90 8V16Z'/%3E%3C/svg%3E") repeat-x 0 0/90px 16px;animation:w 5s linear infinite}
+@keyframes w{to{-webkit-mask-position:90px 0;mask-position:90px 0}}
+.layer{position:absolute;left:0;bottom:0;width:100%;height:var(--H,100%);padding:34px 38px;display:flex;flex-direction:column;justify-content:space-between}
+.fill .layer{color:var(--on)}
+.top{display:flex;justify-content:space-between;align-items:center;font:600 20px "Bricolage Grotesque",sans-serif}
+.dots{display:flex;gap:7px}.dots i{width:12px;height:12px;border-radius:50%;border:2px solid currentColor}.dots i.on{background:currentColor}
+.digits{font:800 clamp(96px,19vw,224px)/.85 "Bricolage Grotesque",sans-serif;letter-spacing:-.05em;font-variant-numeric:tabular-nums;margin-left:-.04em}
+.task{font:500 22px/1.25 "Bricolage Grotesque",sans-serif;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctrl{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;align-items:center}
+.go{background:var(--ink);color:var(--paper);padding:15px 44px;border-radius:99px;font:700 18px "Bricolage Grotesque",sans-serif;min-width:150px;transition:transform .15s}.go:active{transform:scale(.96)}
+.pill{padding:13px 18px;border-radius:99px;border:1.5px solid var(--line);font-weight:500}.pill:hover{border-color:var(--ink)}.pill.on{background:var(--fill);color:var(--on);border-color:transparent}
+.sp{flex:1}
+section h2{font:700 15px "Bricolage Grotesque",sans-serif;color:var(--mute);margin-bottom:12px}
+.block{padding-bottom:28px;margin-bottom:28px;border-bottom:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stats b{display:block;font:800 40px/1 "Bricolage Grotesque",sans-serif;letter-spacing:-.03em}.stats span{font-size:13px;color:var(--mute)}
+.chart{display:flex;gap:8px;align-items:flex-end;height:84px;margin-top:22px}
+.col{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;font-size:12px;color:var(--mute)}
+.col i{width:100%;background:var(--blue);border-radius:10px 10px 4px 4px;min-height:4px;opacity:.9;transition:height .5s}.col.today{color:var(--ink);font-weight:600}
+form{display:flex;gap:8px;margin-bottom:10px}
+input[type=text]{flex:1;padding:13px 18px;border-radius:99px;border:1.5px solid var(--line);background:transparent;min-width:0}input[type=text]:focus{outline:none;border-color:var(--ink)}
+.add{background:var(--blue);color:#fff;border-radius:99px;padding:0 22px;font-weight:600}
+ul{list-style:none;padding:0;max-height:300px;overflow:auto}
+li{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--line)}
+li .t{flex:1;text-align:left;overflow-wrap:anywhere}li.act .t{font-weight:600}li.act::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:-4px}
+li.done .t{text-decoration:line-through;color:var(--mute)}
+.chk{width:24px;height:24px;border-radius:8px;border:2px solid var(--mute);color:#fff;font-size:14px;display:grid;place-items:center;flex:none}li.done .chk{background:var(--ok);border-color:var(--ok)}
+.n{font-size:13px;color:var(--mute)}.x{color:var(--mute);font-size:20px;padding:0 6px}.x:hover{color:#e5484d}
+.empty{color:var(--mute);padding:14px 0}.clear{margin-top:8px;font-size:13px;color:var(--mute);text-decoration:underline}
+dialog{margin:auto;padding:28px;width:min(440px,92vw);border:1.5px solid var(--ink);border-radius:28px;background:var(--paper);color:var(--ink)}
+dialog::backdrop{background:#0008}dialog h3{font:700 24px "Bricolage Grotesque",sans-serif;margin-bottom:16px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.row input[type=number],.row select{width:96px;padding:7px 10px;border-radius:10px;border:1.5px solid var(--line);background:transparent;color:var(--ink)}
+.row input[type=checkbox]{width:20px;height:20px;accent-color:var(--blue)}.acts{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+footer{text-align:center;color:var(--mute);font-size:13px;padding-bottom:28px}kbd{border:1px solid var(--line);border-radius:6px;padding:0 6px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body data-mode="focus">
+<header><div class="logo">Focus Hub</div><nav><button id="theme">Dark mode</button><button id="open">Settings</button></nav></header>
+<div class="app">
+<section>
+  <div class="stage" id="stage"><div class="layer base"></div><div class="wave"></div><div class="fill"><div class="layer"></div></div></div>
+  <div class="ctrl">
+    <button class="go" id="go">Start</button>
+    <button class="pill" id="reset" title="Reset (R)">Reset</button><button class="pill" id="skip" title="Skip (S)">Skip</button><span class="sp"></span>
+    <span id="tabs" style="display:flex;gap:6px;flex-wrap:wrap"><button class="pill on" data-m="focus">Focus</button><button class="pill" data-m="short">Short break</button><button class="pill" data-m="long">Long break</button></span>
+  </div>
+</section>
+<section>
+  <div class="block"><h2>Today</h2>
+    <div class="stats"><div><b id="sN">0</b><span>sessions</span></div><div><b id="sM">0</b><span>minutes</span></div><div><b id="sS">0</b><span>day streak</span></div><div><b id="sT">0</b><span>all time</span></div></div>
+    <div class="chart" id="chart" aria-label="Sessions in the last 7 days"></div></div>
+  <div><h2>Tasks</h2>
+    <form id="form"><input type="text" id="inp" placeholder="Add a task and press Enter" maxlength="80" autocomplete="off"><button class="add">Add</button></form>
+    <ul id="list"></ul><button class="clear" id="clr">Clear completed</button></div>
+</section>
+</div>
+<footer><kbd>Space</kbd> start/pause · <kbd>R</kbd> reset · <kbd>S</kbd> skip · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> modes · <kbd>N</kbd> new task</footer>
+<dialog id="dlg"><h3>Settings</h3><div id="cfg"></div>
+  <div class="acts"><button class="pill" id="exp">Export data</button><button class="pill" id="imp">Import data</button><button class="pill" id="wipe">Reset all</button><button class="go" id="close" style="margin-left:auto;padding:12px 28px;min-width:0">Done</button></div>
+  <input type="file" id="file" accept="application/json" hidden></dialog>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const key=d=>{d=d||new Date();return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()};
+const D={focus:25,short:5,long:15,every:4,auto:false,sound:true,noise:"off",vol:.5,notify:false};
+let S={tasks:[],log:{},active:null,cycle:0,cfg:{},theme:matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"};
+try{Object.assign(S,JSON.parse(localStorage.getItem("focushub2")||"{}"))}catch(e){}
+S.cfg=Object.assign({},D,S.cfg);
+const save=()=>{try{localStorage.setItem("focushub2",JSON.stringify(S))}catch(e){}};
+const NAME={focus:"Focus",short:"Short break",long:"Long break"};
+let mode="focus",total=1,left=1,t=null,end=0,ctx,nz,lastPaint="";
+function ac(){try{ctx=ctx||new AudioContext();if(ctx.state==="suspended")ctx.resume()}catch(e){}return ctx}
+function chime(){if(!ac())return;[660,880,1175].forEach((f,i)=>{const o=ctx.createOscillator(),g=ctx.createGain(),s=ctx.currentTime+i*.2;o.type="sine";o.frequency.value=f;o.connect(g);g.connect(ctx.destination);g.gain.setValueAtTime(.2,s);g.gain.exponentialRampToValueAtTime(.001,s+.5);o.start(s);o.stop(s+.5)})}
+function noise(on){if(nz){try{nz.stop()}catch(e){}nz=null}if(!on||S.cfg.noise==="off"||!ac())return;
+ const n=ctx.sampleRate*3,b=ctx.createBuffer(1,n,ctx.sampleRate),d=b.getChannelData(0),brown=S.cfg.noise==="brown";let l=0;
+ for(let i=0;i<n;i++){const w=Math.random()*2-1;l=brown?(l+.02*w)/1.02:w;d[i]=brown?l*3.5:w}
+ const s=ctx.createBufferSource(),f=ctx.createBiquadFilter(),g=ctx.createGain();s.buffer=b;s.loop=true;
+ f.type=brown?"lowpass":"bandpass";f.frequency.value=brown?500:2800;g.gain.value=S.cfg.vol*(brown?.6:.35);
+ s.connect(f);f.connect(g);g.connect(ctx.destination);s.start();nz=s}
+function notify(a,b){try{if(S.cfg.notify&&Notification.permission==="granted")new Notification(a,{body:b})}catch(e){}}
+function setMode(m){clearInterval(t);t=null;noise(false);mode=m;total=left=S.cfg[m]*60;lastPaint="";
+ document.body.dataset.mode=m==="focus"?"focus":"break";$$("#tabs .pill").forEach(b=>b.classList.toggle("on",b.dataset.m===m));paint()}
+function paint(){const mm=String(Math.floor(left/60)).padStart(2,"0"),ss=String(left%60).padStart(2,"0");
+ const a=S.tasks.find(x=>x.id===S.active&&!x.done),e=S.cfg.every,c=S.cycle,filled=mode==="long"&&c>0&&c%e===0?e:c%e;
+ const h=`<div class="top"><span>${NAME[mode]}</span><span class="dots">${[...Array(e)].map((_,i)=>`<i class="${i<filled?"on":""}"></i>`).join("")}</span></div><div class="digits">${mm}:${ss}</div><div class="task">${a?esc(a.text):mode==="focus"?"No task selected":"Rest your eyes"}</div>`;
+ if(h!==lastPaint){$$(".layer").forEach(l=>l.innerHTML=h);lastPaint=h}
+ const st=$("#stage");st.style.setProperty("--p",(1-left/total)*100+"%");st.style.setProperty("--H",st.clientHeight-4+"px");
+ $("#go").textContent=t?"Pause":left<total?"Resume":"Start";document.title=(t?mm+":"+ss+" · ":"")+"Focus Hub"}
+function toggle(){if(t){clearInterval(t);t=null;noise(false);return paint()}
+ end=Date.now()+left*1000;ac();try{if(S.cfg.notify&&Notification.permission==="default")Notification.requestPermission()}catch(e){}
+ t=setInterval(()=>{left=Math.max(0,Math.round((end-Date.now())/1000));paint();if(!left)done()},250);if(mode==="focus")noise(true);paint()}
+function done(){clearInterval(t);t=null;noise(false);if(S.cfg.sound)chime();
+ if(mode==="focus"){const k=key(),l=S.log[k]=S.log[k]||{n:0,m:0};l.n++;l.m+=S.cfg.focus;S.cycle++;const a=S.tasks.find(x=>x.id===S.active);if(a)a.pomos++;
+  notify("Session complete","Time for a break.");save();render();setMode(S.cycle%S.cfg.every===0?"long":"short")}
+ else{notify("Break over","Ready for the next session?");setMode("focus")}
+ if(S.cfg.auto)toggle()}
+function streak(){let n=0,d=new Date();if(!(S.log[key(d)]||{}).n)d.setDate(d.getDate()-1);while((S.log[key(d)]||{}).n){n++;d.setDate(d.getDate()-1)}return n}
+function render(){const l=S.log[key()]||{n:0,m:0};$("#sN").textContent=l.n;$("#sM").textContent=l.m;$("#sS").textContent=streak();
+ $("#sT").textContent=Object.values(S.log).reduce((a,x)=>a+x.n,0);
+ const days=[...Array(7)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return{d,n:(S.log[key(d)]||{}).n||0,i}}),mx=Math.max(1,...days.map(x=>x.n));
+ $("#chart").innerHTML=days.map(x=>`<div class="col ${x.i===6?"today":""}" title="${x.n} sessions"><i style="height:${x.n/mx*100}%"></i>${x.d.toLocaleDateString("en",{weekday:"short"}).slice(0,2)}</div>`).join("");
+ $("#list").innerHTML=S.tasks.length?S.tasks.map(x=>`<li class="${x.done?"done ":""}${x.id===S.active?"act":""}" data-id="${x.id}"><button class="chk" data-a="done" aria-label="Toggle done">${x.done?"✓":""}</button><button class="t" data-a="pick">${esc(x.text)}</button><span class="n">${x.pomos?x.pomos+(x.pomos>1?" sessions":" session"):""}</span><button class="x" data-a="del" aria-label="Delete task">×</button></li>`).join(""):'<div class="empty">Nothing here yet. Add the first thing you want to finish.</div>';
+ $("#clr").hidden=!S.tasks.some(x=>x.done);paint()}
+$("#list").onclick=e=>{const a=e.target.dataset.a,li=e.target.closest("li");if(!a||!li)return;const x=S.tasks.find(v=>v.id==li.dataset.id);
+ if(a==="done")x.done=!x.done;if(a==="pick")S.active=S.active===x.id?null:x.id;if(a==="del"){S.tasks=S.tasks.filter(v=>v!==x);if(S.active===x.id)S.active=null}save();lastPaint="";render()};
+$("#clr").onclick=()=>{S.tasks=S.tasks.filter(x=>!x.done);save();render()};
+$("#form").onsubmit=e=>{e.preventDefault();const v=$("#inp").value.trim();if(!v)return;const x={id:Date.now(),text:v,done:false,pomos:0};S.tasks.unshift(x);if(!S.active)S.active=x.id;$("#inp").value="";save();lastPaint="";render()};
+$("#tabs").onclick=e=>e.target.dataset.m&&setMode(e.target.dataset.m);
+$("#go").onclick=toggle;$("#reset").onclick=()=>setMode(mode);$("#skip").onclick=()=>setMode(mode==="focus"?"short":"focus");
+document.onkeydown=e=>{if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)||e.target.closest("dialog")||e.metaKey||e.ctrlKey)return;const k=e.key.toLowerCase();
+ if(e.code==="Space"&&e.target.tagName!=="BUTTON"){e.preventDefault();toggle()}else if(k==="r")setMode(mode);else if(k==="s")$("#skip").click();
+ else if(k==="n"){e.preventDefault();$("#inp").focus()}else if("123".includes(k)&&k)setMode(["focus","short","long"][+k-1])};
+function theme(){document.documentElement.dataset.theme=S.theme;$("#theme").textContent=S.theme==="dark"?"Light mode":"Dark mode";$('meta[name=theme-color]').content=S.theme==="dark"?"#0D1430":"#3047FF"}
+$("#theme").onclick=()=>{S.theme=S.theme==="dark"?"light":"dark";save();theme()};
+const F=[["focus","Focus minutes","number",1,120],["short","Short break minutes","number",1,60],["long","Long break minutes","number",1,90],["every","Sessions before long break","number",2,8],
+ ["auto","Start next session automatically","checkbox"],["sound","Chime when a session ends","checkbox"],["notify","Desktop notifications","checkbox"],["noise","Background sound","select"],["vol","Sound volume","range"]];
+function drawCfg(){$("#cfg").innerHTML=F.map(([k,l,ty,mn,mx])=>`<label class="row"><span>${l}</span>${ty==="select"?`<select data-k="${k}">${["off","rain","brown"].map(o=>`<option value="${o}" ${S.cfg[k]===o?"selected":""}>${o==="brown"?"brown noise":o}</option>`).join("")}</select>`:
+ ty==="checkbox"?`<input type="checkbox" data-k="${k}" ${S.cfg[k]?"checked":""}>`:ty==="range"?`<input type="range" data-k="${k}" min="0" max="1" step=".05" value="${S.cfg[k]}">`:`<input type="number" data-k="${k}" min="${mn}" max="${mx}" value="${S.cfg[k]}">`}</label>`).join("")}
+$("#cfg").onchange=$("#cfg").oninput=e=>{const k=e.target.dataset.k;if(!k)return;const v=e.target.type==="checkbox"?e.target.checked:e.target.type==="number"||e.target.type==="range"?+e.target.value||D[k]:e.target.value;
+ S.cfg[k]=v;save();if(k==="notify"&&v)try{Notification.requestPermission()}catch(x){}if(["noise","vol"].includes(k)&&t&&mode==="focus")noise(true);if(!t&&["focus","short","long","every"].includes(k))setMode(mode)};
+$("#open").onclick=()=>{drawCfg();$("#dlg").showModal()};$("#close").onclick=()=>$("#dlg").close();
+$("#exp").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:"application/json"}));a.download="focus-hub-backup.json";a.click()};
+$("#imp").onclick=()=>$("#file").click();
+$("#file").onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(x=>{try{Object.assign(S,JSON.parse(x));S.cfg=Object.assign({},D,S.cfg);save();theme();setMode("focus");render();drawCfg()}catch(err){alert("That file isn’t a valid Focus Hub backup.")}})};
+$("#wipe").onclick=()=>{if(confirm("Delete all tasks, stats and settings?")){try{localStorage.removeItem("focushub2")}catch(e){}location.reload()}};
+new ResizeObserver(()=>paint()).observe($("#stage"));
+theme();setMode("focus");render();
+</script>
+</body>
+</html>
